@@ -19,6 +19,7 @@ def plot_maps(temperature, lon, lat):
         axes[kk].set_global()
         axes[kk].coastlines()
         axes[kk].contourf(lon, lat, temperature[kk],transform=ccrs.PlateCarree(), cmap='coolwarm') 
+        
     return fig, axes
 
 

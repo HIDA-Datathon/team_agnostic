@@ -60,10 +60,10 @@ for jj in range(lat_sep):
 zone_array_flat = np.reshape(zone_array, [-1, 16 * 6])
 
 
-corr_array_vul = np.zeros((16 * 6, 30))
+corr_array_vul = np.zeros((16 * 6, 20))
 corr_array_sun = corr_array_vul.copy()
 
-for kk in range(30):
+for kk in range(20):
     for n, ii in enumerate(zone_array_flat.T):
         corr_array_vul[n, kk] = pearsonr(np.roll(ii, -kk), VUL)[0]
         corr_array_sun[n, kk] = pearsonr(np.roll(ii, -kk), SUN)[0]
@@ -76,11 +76,11 @@ plt.figure(figsize=(15,5))
 sns.heatmap(corr_array_vul, center=0, xticklabels=3)
 plt.ylabel('Years + x')
 plt.title('Correlations Volcanic')
-plt.savefig(f'{OUT_PATH}/correlations_vul.png', transparent=True, bbox_inches='tight')
+plt.savefig(f'{OUT_PATH}/correlations_vol.png', transparent=True, bbox_inches='tight')
 
 
 plt.figure(figsize=(15,5))
 sns.heatmap(corr_array_sun, center=0, xticklabels=3)
 plt.ylabel('Years + x')
 plt.title('Correlations Sun')
-plt.savefig(f'{OUT_PATH}/correlations_sun.png')
+plt.savefig(f'{OUT_PATH}/correlations_sun.png', bbox_inches='tight', transparent=True)
