@@ -36,6 +36,7 @@ def butter_bandstop_filter(data, lowcut, highcut, fs, order):
 
     i, u = butter(order, [low, high], btype='bandstop')
     y = lfilter(i, u, data)
+    #filtered = signal.sosfilt(sos, sig)
     return y
 
 
