@@ -6,6 +6,7 @@ __pycache__
 .DS_Store
 timo.py
 frequencyanalysis_output
+k_means_out
 
 # Put your own test folder/files here which should not appear on remote git
 # Adding the data folder

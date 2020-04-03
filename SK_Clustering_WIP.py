@@ -11,6 +11,7 @@ import pandas as pd
 #import cartopy.crs as ccrs
 import matplotlib.pyplot as plt
 import mglearn
+from frequencyanalysis.filter import butter_bandstop_filter
 
 #say_hello()
 
@@ -43,6 +44,9 @@ mean = np.mean(Globalmeantemp["T2m"])
 Var_frommean = Globalmeantemp["T2m"] - mean
 plt.plot(Var_frommean)
 
+# -----------------------------------------------------------------------------
+# K-Means for temp anomalies
+# -----------------------------------------------------------------------------
 from sklearn.cluster import KMeans
 #Initialize the algorithm and fit it with the data
 kmeans = KMeans(n_clusters = 5)
@@ -54,39 +58,51 @@ print("Cluster memberships:\n{}".format(kmeans.labels_))
 classes = kmeans.predict(X)
 #Inspect the centroids of the clusters
 print(kmeans.cluster_centers_)
+kmeans_clusters = kmeans.cluster_centers_
 #Shortcut to see/visualize the datapoints and range of each cluster
 mglearn.discrete_scatter(X, X, kmeans.labels_, markers='o')
 #Volcanic activity is expected to have the maximum impact out of all forcings so look for the time points which are in the cluster associated with the lowest centroid
-dip = np.argwhere(classes==np.argmin(kmeans.cluster_centers_))
+dip = np.argwhere(classes==np.argmin(kmeans_clusters))
 #look for the years which have the biggest dips
 dipinyear = list(int(timelist[i][0]/10000) for i in dip)
 len(dipinyear)
 
 # -----------------------------------------------------------------------------
-# Apply a filter to the
+# K-Means for filtered temp anomalies
 # -----------------------------------------------------------------------------
-from frequencyanalysis.filter import butter_bandstop_filter
 #Initialize the algorithm and fit it with the data
 kmeans = KMeans(n_clusters = 5)
-
 X = Var_frommean.to_numpy().reshape(-1,1)
-kmeans.fit(X)
-kmeans.cluster_centers_
+# apply the filter
+# define window to filter
+lowcut = 1 / (365*86400*10)
+highcut = 1 / (365*86400*12)
+fs = 1 / (365*86400)
+order = 25
+X_filtered = butter_bandstop_filter(X, lowcut, highcut, fs, order)
+kmeans.fit(X_filtered)
 print("Cluster memberships:\n{}".format(kmeans.labels_))
 #Assign classes to each data point based on the model
-classes = kmeans.predict(X)
+classes = kmeans.predict(X_filtered)
 #Inspect the centroids of the clusters
 print(kmeans.cluster_centers_)
+kmeans_clusters_filtered = kmeans.cluster_centers_
 #Shortcut to see/visualize the datapoints and range of each cluster
 mglearn.discrete_scatter(X, X, kmeans.labels_, markers='o')
 #Volcanic activity is expected to have the maximum impact out of all forcings so look for the time points which are in the cluster associated with the lowest centroid
-dip = np.argwhere(classes==np.argmin(kmeans.cluster_centers_))
+dip_filtered = np.argwhere(classes==np.argmin(kmeans_clusters_filtered))
 #look for the years which have the biggest dips
-dipinyear = list(int(timelist[i][0]/10000) for i in dip)
-len(dipinyear)
+dipinyear_filtered = list(int(timelist[i][0]/10000) for i in dip)
+len(dipinyear_filtered)
 
 # -----------------------------------------------------------------------------
-
+# comparing not filtered and filtered Kmean results
+# -----------------------------------------------------------------------------
+plt.plot(X[:300])
+plt.plot(X_filtered[:300])
+for i, j in zip(sorted(kmeans_clusters), sorted(kmeans_clusters_filtered)):
+    print(i, j)
+# -----------------------------------------------------------------------------
 
 shortlistedtimeseries = list(timelist[i][0] for i in dip)
 
@@ -111,7 +127,7 @@ df_South_polar = df_r1[df_r1.lat<-60]
 
 #Taking snapshots of years of interest: this needs to be broadened to consider the 5 year rolling window I think
 kmeans = KMeans(n_clusters = 3)
-for t in shortlistedtimeseries[:5]:
+for t in shortlistedtimeseries[:]:
     Y = df_r1_time[df_r1_time['time']==t]
     series = Y["Var"]
     X = series.to_numpy().reshape(-1,1)
@@ -123,7 +139,41 @@ for t in shortlistedtimeseries[:5]:
     Y["labels"] = classes
     Y["plotlabels"] = kmeans.cluster_centers_[Y["labels"]] #To label the location with the corresponding cluster centroid
 #    print(kmeans.cluster_centers_)
-    plt.figure()
+    plt.figure(figsize=(16,9))
     mglearn.discrete_scatter(Y['lon'], Y['lat'], Y["plotlabels"], markers='o')
     plt.title("Year: "+str(int(t/10000)))
     plt.legend()
+    plt.savefig(("/Users/houben/phd/hackathons/hida_datathon/repos/hida-datathon-ufz/k_means_out/k_mean_" + str(t) + ".png"), dpi=100)
+
+# -----------------------------------------------------------------------------
+# K-Means for filtered temp anomalies
+# -----------------------------------------------------------------------------
+# define the filter
+# define window to filter
+lowcut = 1 / (365*86400*10)
+highcut = 1 / (365*86400*12)
+fs = 1 / (365*86400)
+order = 25
+# plt.plot(X, label="signal")
+# plt.plot(X_filtered, label="filtered")
+# plt.savefig("/Users/houben/phd/hackathons/hida_datathon/repos/hida-datathon-ufz/k_means_out/signal_vs_filter_" + str(t) + "_order_" + str(order) + ".png", dpi=100)
+# plt.close()
+#Taking snapshots of years of interest: this needs to be broadened to consider the 5 year rolling window I think
+for t in shortlistedtimeseries[:]:
+    Y = df_r1_time[df_r1_time['time']==t]
+    series = Y["Var"]
+    X = series.to_numpy().reshape(-1,1)
+    X_filtered = butter_bandstop_filter(X, lowcut, highcut, fs, order)
+#    X = Var_frommean.to_numpy().reshape(-1,1)
+    kmeans.fit(X_filtered)
+#    print("Cluster memberships:\n{}".format(kmeans.labels_))
+    #Assign classes to each data point based on the model
+    classes = kmeans.predict(X_filtered)
+    Y["labels"] = classes
+    Y["plotlabels"] = kmeans.cluster_centers_[Y["labels"]] #To label the location with the corresponding cluster centroid
+#    print(kmeans.cluster_centers_)
+    plt.figure(figsize=(16,9))
+    mglearn.discrete_scatter(Y['lon'], Y['lat'], Y["plotlabels"], markers='o')
+    plt.title("Year: "+str(int(t/10000)))
+    plt.legend()
+    plt.savefig(("/Users/houben/phd/hackathons/hida_datathon/repos/hida-datathon-ufz/k_means_out/k_mean_filtered_" + str(t) + "_order_" + str(order) + ".png"), dpi=100)
