@@ -1,0 +1,164 @@
+def get_solar_data():
+    data = Dataset('data/Solar_forcing_1st_mill.nc', 'r')
+    t = data.variables['time'][:]
+    TSI = data.variables['TSI'][:, 0, 0]
+    data.close()
+    return t, TSI
+
+def get_volcanic_data():
+    data = Dataset('data/Volc_Forc_AOD_1st_mill.nc', 'r')
+    t = data.variables['time'][:]
+    AOD = data.variables['AOD'][:, 0, 0]
+    data.close()
+    return t, AOD
+
+def get_geodata(number):
+    filename = 'data/T2M_R{}_ym_1stMill.nc'.format(number)
+    data = Dataset(filename)
+    t = data.variables['time'][:]
+    lon = data.variables['lon'][:]
+    lat = data.variables['lat'][:]
+    T2m = data.variables['T2m'][:, :, :]
+    data.close()
+    return t, lon, lat, T2m
+    
+#Get statistics from the temperature data to train the Kmeans
+def get_stat(data, t):
+    min=[]
+    max =[]
+    mean =[]
+    std = []
+    for i in range(0,len(t)):
+        min.append(np.min(data[i]))
+        max.append(np.max(data[i]))
+        mean.append(np.mean(data[i]))
+        std.append(np.std(data[i]))
+    X = np.zeros(shape=(len(t), 4))
+    return min, max, mean, std
+
+#Get the predicting array for individual geographical zones
+def get_X(data, t):
+    min=[]
+    max =[]
+    mean =[]
+    std = []
+    for i in range(0,len(t)):
+        min.append(np.min(data[i]))
+        max.append(np.max(data[i]))
+        mean.append(np.mean(data[i]))
+        std.append(np.std(data[i]))
+    X = np.zeros(shape=(len(t), 4))
+    for i in range(len(t)):
+        X[i][0] = min[i]
+        X[i][1] = max[i]
+        X[i][2] = mean[i]
+        X[i][3] = std[i]
+    return X
+
+
+def scatter(a,b,t):
+    fig = plt.figure()
+    ax1 = plt.subplot(111)
+    a = ax1.scatter(a, b, c=t, cmap="cool")
+    ax1.set_xlabel("a")
+    ax1.set_ylabel("b")
+    plt.colorbar(a)
+    plt.show()
+    plt.close()
+  
+#Graph to compare each class from the Kmeans with the volcanic activity
+def AODcomp(KmeansLabels, classe):
+    fig = plt.figure()
+    ax1 = plt.subplot(111)
+    ax1.scatter(t[np.where(KmeansLabels==classe)], t[np.where(KmeansLabels==classe)], color="blue")
+    ax1.set_ylabel("Years in class")
+    ax2 = ax1.twinx()
+    ax2.plot(t, AOD, color="black")
+    ax2.set_ylabel("AOD")
+    plt.show()
+    plt.close()
+
+#Graph to compare each class from the Kmeans with the volcanic activity
+def TSIcomp(KmeansLabels, classe):
+    ax1 = plt.subplot(111)
+    ax1.plot(t, TSI, color="yellow")
+    ax1.set_ylabel("Years in class")
+    ax2 = ax1.twinx()
+    ax2.scatter(t[np.where(KmeansLabels==classe)], t[np.where(KmeansLabels==classe)], color="green")
+    ax2.set_ylabel("AOD")
+    plt.show()
+
+#Climatic forces
+t, TSI = get_solar_data()
+t, AOD = get_volcanic_data()
+
+#data 
+t1, lon1, lat1, T2m1 = get_geodata(1)
+t2, lon2, lat2, T2m2 = get_geodata(2)
+ 
+#Statistics
+ min1, max1, mean1, std1 = get_stat(T2m1,t)
+ 
+scatter(min1,mean1,t1)
+plt.show()
+
+#Kmeans for both simulations temperature data
+from sklearn.cluster import KMeans
+
+min2, max2, mean2, std2 = get_stat(T2m2,t)
+
+#Create predictor array
+X = np.zeros(shape=(len(t),8))
+for i in range(len(t)):
+    X[i][0] = min1[i]
+    X[i][1] = max1[i]
+    X[i][2] = mean1[i]
+    X[i][3] = std1[i]
+    X[i][4] = min2[i]
+    X[i][5] = mean2[i]
+    X[i][6] = max2[i]
+    X[i][7] = std2[i]
+    
+kmeans = KMeans(n_clusters=5)
+kmeans.fit(X)
+print("cluster memeberships:\n{}".format(kmeans.labels_))
+
+#Visualize clusters
+fig = plt.figure(figsize=(10,10))
+ax1 = plt.subplot(111)
+#labels are reshape in 9 columns (closest to 11 in case we can observe any patter in the cluster)
+a = ax1.imshow(kmeans.labels_.reshape(111,9), cmap="jet")
+plt.colorbar(a)
+plt.show()
+
+#Select the class to plot and check if it fits to something
+classe = 2
+AODcomp(kmeans.labels_,classe)
+TSIcomp(kmeans.labels_,classe)
+
+###### Geographica separation
+T1CAr = T2m1[:, :16, :]
+T1CAn = T2m1[:, 16:35, :]
+T1TropN = T2m1[:, 35:47, :]
+T1TropS = T2m1[:, 47:60, :]
+TCan = T2m1[:, 60:82, :]
+TCap = T2m1[:, 82:, :]
+
+
+Xgeography = get_X(T1CAr,t)
+
+means = KMeans(n_clusters=23)
+kmeans.fit(Xgeography)
+print("cluster memeberships:\n{}".format(kmeans.labels_))
+
+
+fig = plt.figure(figsize=(10,10))
+ax1 = plt.subplot(111)
+a = ax1.imshow(kmeans.labels_.reshape(111,9), cmap="jet")
+plt.colorbar(a)
+plt.show()
+
+classe = 20
+
+AODcomp(kmeans.labels_,classe)
+TSIcomp(kmeans.labels_,classe)
